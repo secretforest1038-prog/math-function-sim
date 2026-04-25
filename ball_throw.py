@@ -1,108 +1,110 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import time
 
-# 1. Page Config
-st.set_page_config(page_title="Kumgok Math: Pro", layout="centered")
+# 1. 페이지 설정
+st.set_page_config(page_title="Kumgok Math Class", layout="centered")
 
-# --- UI CSS ---
+# --- UI 스타일 (한글 깨짐 방지 및 버튼 강조) ---
 st.markdown("""
     <style>
     .stButton>button { 
-        width: 100%; height: 70px; font-size: 1.8rem !important;
-        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%) !important;
-        color: white !important; border-radius: 20px !important; border: none !important;
+        width: 100%; height: 60px; font-size: 1.5rem !important;
+        background: #4f46e5 !important; color: white !important; border-radius: 12px !important;
     }
+    .status-box { background: #f1f5f9; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; margin-bottom: 20px; }
     #MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Learning Mode & Sidebar
-st.sidebar.header("🎯 Learning Mode")
-mode = st.sidebar.selectbox("Mission Type", ["Adjust 'a' (Width)", "Adjust 'b' (Axis)", "Adjust 'c' (Starting Point)"])
+# 2. 미션 모드 및 사이드바 설정
+st.sidebar.header("🎯 학습 모드 선택")
+mode = st.sidebar.selectbox("미션을 선택하세요", ["A: a(폭) 조절하기", "B: b(축) 조절하기", "C: c(높이) 조절하기"])
 
+# 기본값 설정
 default_a, default_b, default_c = -1.5, 8.0, 2.0
 
 with st.sidebar:
     st.write("---")
-    if "Adjust 'a'" in mode:
-        a = st.slider("a (Gravity/Width)", -5.0, -0.2, default_a, 0.1)
+    if "A:" in mode:
+        a = st.slider("계수 a (그래프 폭)", -5.0, -0.2, default_a, 0.1)
         b, c = default_b, default_c
-    elif "Adjust 'b'" in mode:
-        b = st.slider("b (Velocity/Axis)", 0.0, 20.0, default_b, 0.1)
+    elif "B:" in mode:
+        b = st.slider("계수 b (축의 위치)", 0.0, 20.0, default_b, 0.1)
         a, c = default_a, default_c
     else:
-        c = st.slider("c (Initial Height)", 0.0, 10.0, default_c, 0.1)
+        c = st.slider("계수 c (시작 높이)", 0.0, 10.0, default_c, 0.1)
         a, b = default_a, default_b
 
-    if st.button("New Target"):
+    if st.button("새 목표 지점 생성"):
         st.session_state.tx = round(np.random.uniform(7, 15), 1)
         st.session_state.ty = round(np.random.uniform(1, 6), 1)
         st.rerun()
 
 if 'tx' not in st.session_state:
-    st.session_state.tx, st.session_state.ty = 12.0, 3.5
+    st.session_state.tx, st.session_state.ty = 11.0, 3.5
 
-# 3. Math Calculations
+# 3. 수학 계산 (궤적 및 범위)
 axis_x = -b / (2*a)
 vertex_y = c - b**2 / (4*a)
 x_end = (-b - np.sqrt(max(0, b**2 - 4*a*c))) / (2*a)
 
-# High-resolution trajectory
-x_full = np.linspace(0, x_end, 50)
+x_full = np.linspace(0, x_end, 40) # 애니메이션 프레임
 y_full = a * x_full**2 + b * x_full + c
 
-# 4. Drawing Function
-def draw_graph(step=None):
-    fig, ax = plt.subplots(figsize=(9, 5))
+# 4. 그래프 그리기 함수 (좌표축 선명하게)
+def draw_plot(step=None):
+    fig, ax = plt.subplots(figsize=(8, 5))
     
-    # Dynamic limits
-    ax.set_xlim(-1.5, max(x_end, st.session_state.tx) + 2)
-    ax.set_ylim(-0.5, max(vertex_y, st.session_state.ty) + 2)
+    # 궤적 범위에 맞춰 축 범위 설정
+    max_x = max(x_end, st.session_state.tx) + 2
+    max_y = max(vertex_y, st.session_state.ty) + 2
     
-    # 1. Subtle Axis of Symmetry (Faded Yellow)
-    ax.axvline(x=axis_x, color='#FFD700', linestyle=':', alpha=0.3, lw=1.5)
+    ax.set_xlim(-1, max_x)
+    ax.set_ylim(-1, max_y)
     
-    # 2. Target
-    ax.add_patch(plt.Rectangle((st.session_state.tx-0.4, st.session_state.ty-0.15), 0.8, 0.3, color='#ef4444', zorder=4))
+    # 1. 좌표축 강조 및 눈금 표시
+    ax.axhline(0, color='black', lw=1)
+    ax.axvline(0, color='black', lw=1)
+    ax.grid(True, linestyle=':', alpha=0.6)
     
-    # 3. Human Silhouette (More detailed)
-    # Leg & Body
-    ax.add_patch(plt.Polygon([[-0.2, 0], [0.2, 0], [0.1, c*0.6], [-0.1, c*0.6]], color='#334155'))
-    ax.add_patch(plt.Polygon([[-0.1, c*0.6], [0.1, c*0.6], [0.2, c], [-0.2, c]], color='#334155'))
-    # Arm throwing
-    ax.plot([0.1, 0.5], [c*0.8, c], color='#334155', lw=4, solid_capstyle='round')
-    # Head
-    head = plt.Circle((0, c+0.25), 0.25, color='#334155')
-    ax.add_patch(head)
-    
-    # 4. Trajectory & Ball
-    if step is not None:
-        ax.plot(x_full[:step], y_full[:step], color='#4f46e5', lw=3, alpha=0.7)
-        ax.plot(x_full[step], y_full[step], 'o', color='#f59e0b', ms=14, mec='black', zorder=5)
-    else:
-        ax.plot(x_full, y_full, color='#4f46e5', alpha=0.1, ls='--')
-        ax.plot(0, c, 'o', color='#f59e0b', ms=12, alpha=0.4)
+    # 2. 목표 지점 (빨간 사각형)
+    ax.add_patch(plt.Rectangle((st.session_state.tx-0.4, st.session_state.ty-0.2), 0.8, 0.4, color='red', zorder=5))
+    ax.text(st.session_state.tx, st.session_state.ty+0.5, f"({st.session_state.tx}, {st.session_state.ty})", 
+            ha='center', color='red', fontweight='bold')
 
-    ax.set_axis_off() # 깔끔한 화면을 위해 축 레이블 숨김 (필요시 제거 가능)
+    # 3. 노란 점선 (대칭축) - 희미하게 가이드만
+    ax.axvline(x=axis_x, color='#FFD700', linestyle='--', alpha=0.4)
+
+    # 4. 공과 궤적
+    if step is not None:
+        # 애니메이션 중
+        ax.plot(x_full[:step], y_full[:step], color='#4f46e5', lw=3)
+        ax.plot(x_full[step], y_full[step], 'o', color='orange', ms=12, mec='black')
+    else:
+        # 대기 중 (실시간 점선 가이드)
+        ax.plot(x_full, y_full, color='#4f46e5', alpha=0.3, ls='--')
+        ax.plot(0, c, 'o', color='orange', ms=12, mec='black')
+
+    ax.set_xlabel("x (Distance)")
+    ax.set_ylabel("y (Height)")
     return fig
 
-# 5. UI Execution
-st.info(f"Target: ({st.session_state.tx}, {st.session_state.ty}) | Mode: {mode}")
+# 5. 메인 화면 실행
+st.markdown(f"<div class='status-box'>{mode}<br>목표 좌표: ({st.session_state.tx}, {st.session_state.ty})</div>", unsafe_allow_html=True)
 
-plot_spot = st.empty()
-plot_spot.pyplot(draw_graph())
+placeholder = st.empty()
+placeholder.pyplot(draw_plot())
 
-if st.button("LAUNCH 🚀"):
-    # Extremely fast redraw
+if st.button("공 던지기 🚀"):
+    # 애니메이션 진행
     for i in range(len(x_full)):
-        plot_spot.pyplot(draw_graph(step=i))
+        placeholder.pyplot(draw_plot(step=i))
     
-    # Final Judgement
+    # 결과 판정
     dist = np.sqrt((x_full - st.session_state.tx)**2 + (y_full - st.session_state.ty)**2)
     if np.min(dist) < 0.7:
         st.balloons()
-        st.success("🎯 MISSION COMPLETE!")
+        st.success("🎯 골인! 미션 성공!")
     else:
-        st.error("MISS!")
+        st.error("앗! 빗나갔습니다. 슬라이더를 다시 조절해보세요.")
