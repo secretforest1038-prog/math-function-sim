@@ -100,4 +100,9 @@ if st.button("LAUNCH 🚀"):
         plot_spot.pyplot(draw_graph(step=i))
     
     # Final Judgement
-    dist = np.sqrt((x_full - st.session_state.tx)**2 + (y_full - st.
+    dist = np.sqrt((x_full - st.session_state.tx)**2 + (y_full - st.session_state.ty)**2)
+    if np.min(dist) < 0.7:
+        st.balloons()
+        st.success("🎯 MISSION COMPLETE!")
+    else:
+        st.error("MISS!")
