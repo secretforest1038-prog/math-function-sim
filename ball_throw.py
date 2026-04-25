@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 # 1. Page Config
 st.set_page_config(page_title="Kumgok Math: Pro", layout="centered")
@@ -13,7 +14,6 @@ st.markdown("""
         background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%) !important;
         color: white !important; border-radius: 20px !important; border: none !important;
     }
-    .mission-status { background: #f8fafc; padding: 15px; border-radius: 15px; border: 2px solid #e2e8f0; text-align: center; font-weight: bold; font-size: 1.2rem; }
     #MainMenu, footer, [data-testid="stToolbar"] { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
@@ -42,75 +42,62 @@ with st.sidebar:
         st.rerun()
 
 if 'tx' not in st.session_state:
-    st.session_state.tx, st.session_state.ty = 11.0, 3.5
+    st.session_state.tx, st.session_state.ty = 12.0, 3.5
 
 # 3. Math Calculations
-# Vertex (Axis of Symmetry)
 axis_x = -b / (2*a)
 vertex_y = c - b**2 / (4*a)
+x_end = (-b - np.sqrt(max(0, b**2 - 4*a*c))) / (2*a)
 
-# End point (Ground)
-discriminant = max(0, b**2 - 4*a*c)
-x_end = (-b - np.sqrt(discriminant)) / (2*a)
-
-# High-resolution trajectory for smoothness
-x_full = np.linspace(0, x_end, 60)
+# High-resolution trajectory
+x_full = np.linspace(0, x_end, 50)
 y_full = a * x_full**2 + b * x_full + c
 
-# 4. Fast Drawing Function
+# 4. Drawing Function
 def draw_graph(step=None):
     fig, ax = plt.subplots(figsize=(9, 5))
     
-    # Set dynamic limits
+    # Dynamic limits
     ax.set_xlim(-1.5, max(x_end, st.session_state.tx) + 2)
     ax.set_ylim(-0.5, max(vertex_y, st.session_state.ty) + 2)
     
-    # 1. Axis of Symmetry (Yellow Dashed Line)
-    ax.axvline(x=axis_x, color='#FFD700', linestyle='--', alpha=0.8, lw=2, label='Axis')
+    # 1. Subtle Axis of Symmetry (Faded Yellow)
+    ax.axvline(x=axis_x, color='#FFD700', linestyle=':', alpha=0.3, lw=1.5)
     
     # 2. Target
     ax.add_patch(plt.Rectangle((st.session_state.tx-0.4, st.session_state.ty-0.15), 0.8, 0.3, color='#ef4444', zorder=4))
     
-    # 3. Human Silhouette (Simple representation)
-    ax.plot([0, 0], [0, c], color='black', lw=4) # Body
-    ax.plot([-0.3, 0.3], [c-0.8, c], color='black', lw=3) # Arm throwing
-    ax.plot(0, c+0.3, 'o', color='black', ms=10) # Head
+    # 3. Human Silhouette (More detailed)
+    # Leg & Body
+    ax.add_patch(plt.Polygon([[-0.2, 0], [0.2, 0], [0.1, c*0.6], [-0.1, c*0.6]], color='#334155'))
+    ax.add_patch(plt.Polygon([[-0.1, c*0.6], [0.1, c*0.6], [0.2, c], [-0.2, c]], color='#334155'))
+    # Arm throwing
+    ax.plot([0.1, 0.5], [c*0.8, c], color='#334155', lw=4, solid_capstyle='round')
+    # Head
+    head = plt.Circle((0, c+0.25), 0.25, color='#334155')
+    ax.add_patch(head)
     
     # 4. Trajectory & Ball
     if step is not None:
         ax.plot(x_full[:step], y_full[:step], color='#4f46e5', lw=3, alpha=0.7)
         ax.plot(x_full[step], y_full[step], 'o', color='#f59e0b', ms=14, mec='black', zorder=5)
     else:
-        # Static Guide Line
-        ax.plot(x_full, y_full, color='#4f46e5', alpha=0.15, ls='--')
-        ax.plot(0, c, 'o', color='#f59e0b', ms=12, alpha=0.5)
+        ax.plot(x_full, y_full, color='#4f46e5', alpha=0.1, ls='--')
+        ax.plot(0, c, 'o', color='#f59e0b', ms=12, alpha=0.4)
 
-    ax.set_xlabel("Distance (x)")
-    ax.set_ylabel("Height (y)")
-    ax.grid(True, alpha=0.2)
+    ax.set_axis_off() # 깔끔한 화면을 위해 축 레이블 숨김 (필요시 제거 가능)
     return fig
 
-# 5. Execution UI
-st.markdown(f"<div class='mission-status'>{mode} | Target: ({st.session_state.tx}, {st.session_state.ty})</div>", unsafe_allow_html=True)
+# 5. UI Execution
+st.info(f"Target: ({st.session_state.tx}, {st.session_state.ty}) | Mode: {mode}")
 
 plot_spot = st.empty()
 plot_spot.pyplot(draw_graph())
 
 if st.button("LAUNCH 🚀"):
-    # Faster animation with fewer redraws of heavy elements
+    # Extremely fast redraw
     for i in range(len(x_full)):
         plot_spot.pyplot(draw_graph(step=i))
     
-    # Result Feedback
-    dist = np.sqrt((x_full - st.session_state.tx)**2 + (y_full - st.session_state.ty)**2)
-    if np.min(dist) < 0.7:
-        st.balloons()
-        st.success("🎯 MISSION COMPLETE!")
-        if "Adjust 'a'" in mode:
-            st.info("**Math Tip:** 'a'가 변하면 포물선의 폭이 변하지만, 대칭축의 위치는 고정됩니다!")
-        elif "Adjust 'b'" in mode:
-            st.info("**Math Tip:** 'b'가 변하면 대칭축($x = -b/2a$)이 좌우로 이동합니다!")
-        else:
-            st.info("**Math Tip:** 'c'가 변하면 그래프가 그대로 위아래로 평행이동합니다!")
-    else:
-        st.error("MISS! Try adjusting the value.")
+    # Final Judgement
+    dist = np.sqrt((x_full - st.session_state.tx)**2 + (y_full - st.
